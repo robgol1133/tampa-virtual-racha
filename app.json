@@ -22,6 +22,11 @@
     "ios": {
       "bundleIdentifier": "com.tampavirtualracha.app",
       "supportsTablet": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2fca381b-e6a6-4828-bff0-e604229e25ef"
+      }
     }
   }
 }
