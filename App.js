@@ -64,7 +64,7 @@ const LevelBadge = ({ stars }) => {
 };
 
 // ─── Componente: Card do Jogador ────────────────────────────────────────────────
-const PlayerCard = ({ player, onDelete, onTogglePresence, animDelay = 0 }) => {
+const PlayerCard = ({ player, onDelete, onTogglePresence, onEdit, animDelay = 0 }) => {
   const slideAnim = useRef(new Animated.Value(60)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -118,6 +118,14 @@ const PlayerCard = ({ player, onDelete, onTogglePresence, animDelay = 0 }) => {
             <Text style={[styles.actionBtnText, { color: presenceColor }]}>
               {player.presente ? '✓ Confirmado' : '○ Ausente'}
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => onEdit(player)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.editBtnText}>✎</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -215,10 +223,23 @@ const SorteioModal = ({ visible, times, onClose }) => {
 };
 
 // ─── Componente: Modal de Cadastro ──────────────────────────────────────────────
-const CadastroModal = ({ visible, onClose, onSave }) => {
+const CadastroModal = ({ visible, onClose, onSave, jogadorEditando }) => {
+  const isEdicao = !!jogadorEditando;
   const [nome, setNome] = useState('');
   const [idade, setIdade] = useState('');
   const [estrelas, setEstrelas] = useState(3);
+
+  useEffect(() => {
+    if (jogadorEditando) {
+      setNome(jogadorEditando.nome);
+      setIdade(String(jogadorEditando.idade));
+      setEstrelas(jogadorEditando.estrelas);
+    } else {
+      setNome('');
+      setIdade('');
+      setEstrelas(3);
+    }
+  }, [jogadorEditando, visible]);
 
   const handleSave = () => {
     if (!nome.trim()) return Alert.alert('Atenção', 'Informe o nome do jogador.');
@@ -233,13 +254,23 @@ const CadastroModal = ({ visible, onClose, onSave }) => {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContainer, { maxHeight: '70%' }]}>
+        <View style={[styles.modalContainer, { maxHeight: '80%' }]}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>➕ Novo Jogador</Text>
+            <Text style={styles.modalTitle}>
+              {isEdicao ? '✎ Editar Jogador' : '➕ Novo Jogador'}
+            </Text>
             <TouchableOpacity onPress={onClose} style={styles.modalClose}>
               <Text style={styles.modalCloseText}>✕</Text>
             </TouchableOpacity>
           </View>
+
+          {isEdicao && (
+            <View style={styles.editBanner}>
+              <Text style={styles.editBannerText}>
+                Editando dados de {jogadorEditando.nome}
+              </Text>
+            </View>
+          )}
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Nome</Text>
@@ -268,15 +299,27 @@ const CadastroModal = ({ visible, onClose, onSave }) => {
 
           <View style={styles.formGroup}>
             <Text style={styles.formLabel}>Nível de Habilidade</Text>
-            <View style={{ marginTop: 8 }}>
+            <View style={{ marginTop: 8, marginBottom: 10 }}>
               <StarRating value={estrelas} onChange={setEstrelas} size={30} />
             </View>
             <LevelBadge stars={estrelas} />
           </View>
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-            <Text style={styles.saveBtnText}>Cadastrar Jogador</Text>
+          <TouchableOpacity
+            style={[styles.saveBtn, isEdicao && styles.saveBtnEdit]}
+            onPress={handleSave}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.saveBtnText}>
+              {isEdicao ? '✓ Salvar Alterações' : 'Cadastrar Jogador'}
+            </Text>
           </TouchableOpacity>
+
+          {isEdicao && (
+            <TouchableOpacity style={styles.cancelEditBtn} onPress={onClose} activeOpacity={0.8}>
+              <Text style={styles.cancelEditBtnText}>Cancelar</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -288,6 +331,7 @@ export default function App() {
   const [jogadores, setJogadores] = useState([]);
   const [showCadastro, setShowCadastro] = useState(false);
   const [showSorteio, setShowSorteio] = useState(false);
+  const [jogadorEditando, setJogadorEditando] = useState(null);
   const [times, setTimes] = useState([]);
   const [filtro, setFiltro] = useState('todos'); // todos | presentes
   const headerAnim = useRef(new Animated.Value(-20)).current;
@@ -325,6 +369,24 @@ export default function App() {
     const nova = jogadores.filter(j => j.id !== id);
     setJogadores(nova);
     saveJogadores(nova);
+  };
+
+  const editJogador = (jogador) => {
+    setJogadorEditando(jogador);
+    setShowCadastro(true);
+  };
+
+  const salvarEdicao = (dados) => {
+    if (jogadorEditando) {
+      const nova = jogadores.map(j =>
+        j.id === jogadorEditando.id ? { ...j, ...dados } : j
+      );
+      setJogadores(nova);
+      saveJogadores(nova);
+      setJogadorEditando(null);
+    } else {
+      addJogador(dados);
+    }
   };
 
   const togglePresenca = (id) => {
@@ -438,6 +500,7 @@ export default function App() {
             player={item}
             onDelete={deleteJogador}
             onTogglePresence={togglePresenca}
+            onEdit={editJogador}
             animDelay={index * 60}
           />
         )}
@@ -455,8 +518,9 @@ export default function App() {
       {/* ── Modals ── */}
       <CadastroModal
         visible={showCadastro}
-        onClose={() => setShowCadastro(false)}
-        onSave={addJogador}
+        onClose={() => { setShowCadastro(false); setJogadorEditando(null); }}
+        onSave={salvarEdicao}
+        jogadorEditando={jogadorEditando}
       />
       <SorteioModal
         visible={showSorteio}
@@ -609,6 +673,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   deleteBtnText: { fontSize: 14, color: COLORS.red, fontWeight: '800' },
+  editBtn: {
+    borderColor: COLORS.blue + '55',
+    backgroundColor: '#0D2233',
+    paddingHorizontal: 14,
+  },
+  editBtnText: { fontSize: 15, color: COLORS.blue, fontWeight: '800' },
+  editBanner: {
+    backgroundColor: COLORS.blue + '18',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.blue + '44',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 18,
+  },
+  editBannerText: { fontSize: 13, color: COLORS.blue, fontWeight: '600' },
+  saveBtnEdit: { backgroundColor: COLORS.blue },
+  cancelEditBtn: {
+    backgroundColor: COLORS.bgInput,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  cancelEditBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.textMuted },
 
   // FAB
   fab: {
