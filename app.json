@@ -7,17 +7,25 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
+      "image": "./assets/splash.png",
       "backgroundColor": "#0A0E1A"
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0E1A"
       },
+      "versionCode": 1,
       "package": "com.tampavirtualracha.app"
     },
     "ios": {
       "bundleIdentifier": "com.tampavirtualracha.app",
       "supportsTablet": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2fca381b-e6a6-4828-bff0-e604229e25ef"
+      }
     }
   }
 }
