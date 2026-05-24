@@ -3,6 +3,7 @@
     "name": "Tampa Virtual do Racha",
     "slug": "tampa-virtual-racha",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -15,17 +16,12 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0E1A"
       },
-      "versionCode": 1,
-      "package": "com.tampavirtualracha.app"
+      "package": "com.tampavirtualracha.app",
+      "versionCode": 1
     },
     "ios": {
       "bundleIdentifier": "com.tampavirtualracha.app",
       "supportsTablet": false
-    },
-    "extra": {
-      "eas": {
-        "projectId": "2fca381b-e6a6-4828-bff0-e604229e25ef"
-      }
     }
   }
 }
