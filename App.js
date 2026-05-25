@@ -345,6 +345,7 @@ export default function App() {
   const [times, setTimes] = useState([]);
   const [sorteioInfo, setSorteioInfo] = useState({ reserva3: false, reserva4: false });
   const [filtro, setFiltro] = useState('todos'); // todos | presentes
+  const [busca, setBusca] = useState('');
   const headerAnim = useRef(new Animated.Value(-20)).current;
   const headerFade = useRef(new Animated.Value(0)).current;
 
@@ -468,7 +469,12 @@ export default function App() {
   };
 
   const presentes = jogadores.filter(j => j.presente);
-  const listaFiltrada = filtro === 'presentes' ? presentes : jogadores;
+  const listaPorFiltro = filtro === 'presentes' ? presentes : jogadores;
+  const listaFiltrada = busca.trim() === ''
+    ? listaPorFiltro
+    : listaPorFiltro.filter(j =>
+        j.nome.toLowerCase().includes(busca.toLowerCase().trim())
+      );
 
   const statsTotal = jogadores.length;
   const statsPresentes = presentes.length;
@@ -509,6 +515,27 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
+      {/* ── Busca ── */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            value={busca}
+            onChangeText={setBusca}
+            placeholder="Buscar jogador..."
+            placeholderTextColor={COLORS.textDim}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {busca.length > 0 && (
+            <TouchableOpacity onPress={() => setBusca('')} style={styles.searchClear}>
+              <Text style={styles.searchClearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* ── Filtros ── */}
       <View style={styles.filterRow}>
         <TouchableOpacity
@@ -539,12 +566,20 @@ export default function App() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>🏟️</Text>
+            <Text style={styles.emptyStateIcon}>{busca ? '🔎' : '🏟️'}</Text>
             <Text style={styles.emptyStateText}>
-              {filtro === 'presentes' ? 'Nenhum jogador confirmado' : 'Nenhum jogador cadastrado'}
+              {busca
+                ? `Nenhum resultado para "${busca}"`
+                : filtro === 'presentes'
+                  ? 'Nenhum jogador confirmado'
+                  : 'Nenhum jogador cadastrado'}
             </Text>
             <Text style={styles.emptyStateHint}>
-              {filtro === 'presentes' ? 'Confirme presença na lista completa' : 'Toque em + para adicionar jogadores'}
+              {busca
+                ? 'Tente outro nome'
+                : filtro === 'presentes'
+                  ? 'Confirme presença na lista completa'
+                  : 'Toque em + para adicionar jogadores'}
             </Text>
           </View>
         }
@@ -656,6 +691,38 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   sorteioBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.green },
+
+  // Busca
+  searchRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.bgInput,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+  },
+  searchIcon: { fontSize: 16, marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: COLORS.text,
+    paddingVertical: 10,
+  },
+  searchClear: {
+    padding: 4,
+    marginLeft: 6,
+  },
+  searchClearText: {
+    fontSize: 13,
+    color: COLORS.textDim,
+    fontWeight: '700',
+  },
 
   // Filtros
   filterRow: {
