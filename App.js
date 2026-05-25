@@ -29,6 +29,7 @@ const COLORS = {
   team1: '#00E676',
   team2: '#4FC3F7',
   team3: '#FF6D00',
+  team4: '#C084FC',
 };
 
 // ─── Componente: Estrelas ──────────────────────────────────────────────────────
@@ -151,9 +152,9 @@ const PlayerCard = ({ player, onDelete, onTogglePresence, onEdit, animDelay = 0 
 };
 
 // ─── Componente: Modal de Sorteio ───────────────────────────────────────────────
-const SorteioModal = ({ visible, times, onClose }) => {
-  const teamColors = [COLORS.team1, COLORS.team2, COLORS.team3];
-  const teamNames = ['⚡ Time 1', '💧 Time 2', '🔥 Time 3'];
+const SorteioModal = ({ visible, times, reserva3, reserva4, onClose }) => {
+  const teamColors = [COLORS.team1, COLORS.team2, COLORS.team3, COLORS.team4];
+  const teamNames = ['⚡ Time 1', '💧 Time 2', '🔥 Time 3 (Reserva)', '💜 Time 4 (Reserva)'];
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -183,6 +184,15 @@ const SorteioModal = ({ visible, times, onClose }) => {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
+            {(reserva3 || reserva4) && (
+              <View style={styles.sorteioBanner}>
+                <Text style={styles.sorteioBannerText}>
+                  ℹ️ Times 1 e 2 foram equilibrados por estrelas e idade.
+                  {reserva3 ? ' Time 3 formado pelos confirmados após o 20º.' : ''}
+                  {reserva4 ? ' Time 4 formado pelos confirmados após o 30º.' : ''}
+                </Text>
+              </View>
+            )}
             {times.map((time, idx) => (
               <View key={idx} style={[styles.teamCard, { borderColor: teamColors[idx] + '55' }]}>
                 <View style={[styles.teamHeader, { backgroundColor: teamColors[idx] + '22' }]}>
@@ -333,6 +343,7 @@ export default function App() {
   const [showSorteio, setShowSorteio] = useState(false);
   const [jogadorEditando, setJogadorEditando] = useState(null);
   const [times, setTimes] = useState([]);
+  const [sorteioInfo, setSorteioInfo] = useState({ reserva3: false, reserva4: false });
   const [filtro, setFiltro] = useState('todos'); // todos | presentes
   const headerAnim = useRef(new Animated.Value(-20)).current;
   const headerFade = useRef(new Animated.Value(0)).current;
@@ -390,27 +401,69 @@ export default function App() {
   };
 
   const togglePresenca = (id) => {
-    const nova = jogadores.map(j => j.id === id ? { ...j, presente: !j.presente } : j);
+    const nova = jogadores.map(j => {
+      if (j.id !== id) return j;
+      const confirmando = !j.presente;
+      return {
+        ...j,
+        presente: confirmando,
+        // Grava o momento exato da confirmação; remove ao desconfirmar
+        confirmedAt: confirmando ? Date.now() : null,
+      };
+    });
     setJogadores(nova);
     saveJogadores(nova);
   };
 
   const realizarSorteio = () => {
-    const presentes = jogadores.filter(j => j.presente);
+    // Filtrar confirmados e ordenar pelo momento exato de confirmação (do mais antigo ao mais recente)
+    const presentes = jogadores
+      .filter(j => j.presente)
+      .sort((a, b) => (a.confirmedAt || 0) - (b.confirmedAt || 0));
+
     if (presentes.length < 2) {
       return Alert.alert('Atenção', 'Confirme pelo menos 2 jogadores para realizar o sorteio!');
     }
 
-    // Sorteia aleatoriamente
-    const embaralhados = [...presentes].sort(() => Math.random() - 0.5);
-    const numTimes = Math.min(3, Math.ceil(embaralhados.length / 10) || 1);
-    const resultado = Array.from({ length: numTimes }, () => []);
+    // Separar por ordem de confirmação (quem confirmou primeiro fica nos times principais):
+    // 1º ao 20º  → Time 1 e Time 2 (equilibrados por estrelas e idade)
+    // 21º ao 30º → Time 3 (reserva)
+    // 31º+       → Time 4 (reserva)
+    const principais = presentes.slice(0, 20);
+    const reserva3   = presentes.slice(20, 30);
+    const reserva4   = presentes.slice(30);
 
-    embaralhados.forEach((j, i) => {
-      resultado[i % numTimes].push(j);
+    // Ordenar os principais por score (estrelas têm mais peso que idade)
+    // para distribuição equilibrada via serpentina
+    const ordenados = [...principais].sort((a, b) => {
+      const scoreA = a.estrelas * 10 + (a.idade / 10);
+      const scoreB = b.estrelas * 10 + (b.idade / 10);
+      return scoreB - scoreA; // maior score primeiro
     });
 
+    // Distribuição em serpentina: garante equilíbrio entre os dois times
+    // Posição: 0→T1, 1→T2, 2→T2, 3→T1, 4→T1, 5→T2 ...
+    const time1 = [];
+    const time2 = [];
+    ordenados.forEach((j, i) => {
+      const rodada = Math.floor(i / 2);
+      const posNaRodada = i % 2;
+      if (rodada % 2 === 0) {
+        posNaRodada === 0 ? time1.push(j) : time2.push(j);
+      } else {
+        posNaRodada === 0 ? time2.push(j) : time1.push(j);
+      }
+    });
+
+    // Montar resultado final
+    const resultado = [time1, time2];
+    const hasReserva3 = reserva3.length > 0;
+    const hasReserva4 = reserva4.length > 0;
+    if (hasReserva3) resultado.push(reserva3);
+    if (hasReserva4) resultado.push(reserva4);
+
     setTimes(resultado);
+    setSorteioInfo({ reserva3: hasReserva3, reserva4: hasReserva4 });
     setShowSorteio(true);
   };
 
@@ -525,6 +578,8 @@ export default function App() {
       <SorteioModal
         visible={showSorteio}
         times={times}
+        reserva3={sorteioInfo.reserva3}
+        reserva4={sorteioInfo.reserva4}
         onClose={() => setShowSorteio(false)}
       />
     </SafeAreaView>
@@ -700,6 +755,20 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   cancelEditBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.textMuted },
+  sorteioBanner: {
+    backgroundColor: '#1a2a3a',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.blue + '44',
+    padding: 12,
+    marginBottom: 14,
+  },
+  sorteioBannerText: {
+    fontSize: 12,
+    color: COLORS.blue,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
 
   // FAB
   fab: {
