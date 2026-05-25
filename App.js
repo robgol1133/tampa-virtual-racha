@@ -469,7 +469,11 @@ export default function App() {
   };
 
   const presentes = jogadores.filter(j => j.presente);
-  const listaPorFiltro = filtro === 'presentes' ? presentes : jogadores;
+  const ausentes = jogadores.filter(j => !j.presente);
+  const listaPorFiltro =
+    filtro === 'presentes' ? presentes :
+    filtro === 'ausentes'  ? ausentes  :
+    jogadores;
   const listaFiltrada = busca.trim() === ''
     ? listaPorFiltro
     : listaPorFiltro.filter(j =>
@@ -478,6 +482,7 @@ export default function App() {
 
   const statsTotal = jogadores.length;
   const statsPresentes = presentes.length;
+  const statsAusentes = ausentes.length;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -556,6 +561,15 @@ export default function App() {
             ✓ Confirmados ({statsPresentes})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterBtn, filtro === 'ausentes' && styles.filterBtnActiveRed]}
+          onPress={() => setFiltro('ausentes')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.filterBtnText, filtro === 'ausentes' && styles.filterBtnTextRed]}>
+            ○ Ausentes ({statsAusentes})
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* ── Lista ── */}
@@ -566,20 +580,26 @@ export default function App() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>{busca ? '🔎' : '🏟️'}</Text>
+            <Text style={styles.emptyStateIcon}>
+              {busca ? '🔎' : filtro === 'ausentes' ? '✅' : '🏟️'}
+            </Text>
             <Text style={styles.emptyStateText}>
               {busca
                 ? `Nenhum resultado para "${busca}"`
                 : filtro === 'presentes'
                   ? 'Nenhum jogador confirmado'
-                  : 'Nenhum jogador cadastrado'}
+                  : filtro === 'ausentes'
+                    ? 'Nenhum jogador ausente'
+                    : 'Nenhum jogador cadastrado'}
             </Text>
             <Text style={styles.emptyStateHint}>
               {busca
                 ? 'Tente outro nome'
                 : filtro === 'presentes'
                   ? 'Confirme presença na lista completa'
-                  : 'Toque em + para adicionar jogadores'}
+                  : filtro === 'ausentes'
+                    ? 'Todos os jogadores estão confirmados!'
+                    : 'Toque em + para adicionar jogadores'}
             </Text>
           </View>
         }
@@ -730,6 +750,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 8,
     marginBottom: 8,
+    flexWrap: 'wrap',
   },
   filterBtn: {
     borderRadius: 8,
@@ -739,8 +760,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   filterBtnActive: { backgroundColor: COLORS.greenMuted, borderColor: COLORS.green },
+  filterBtnActiveRed: { backgroundColor: COLORS.redMuted, borderColor: COLORS.red + '88' },
   filterBtnText: { fontSize: 13, color: COLORS.textMuted, fontWeight: '600' },
   filterBtnTextActive: { color: COLORS.green },
+  filterBtnTextRed: { color: COLORS.red },
 
   // Lista
   listContent: { paddingHorizontal: 16, paddingBottom: 100 },
