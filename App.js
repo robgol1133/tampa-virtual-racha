@@ -32,6 +32,20 @@ const COLORS = {
   team4: '#C084FC',
 };
 
+// ─── Utilitários ───────────────────────────────────────────────────────────────
+const anoAtual = new Date().getFullYear();
+
+const calcularIdade = (anoNascimento) => {
+  const ano = parseInt(anoNascimento);
+  if (!ano || isNaN(ano)) return null;
+  return anoAtual - ano;
+};
+
+const anoValido = (anoNascimento) => {
+  const ano = parseInt(anoNascimento);
+  return !isNaN(ano) && ano >= 1940 && ano <= anoAtual - 5;
+};
+
 // ─── Componente: Estrelas ──────────────────────────────────────────────────────
 const StarRating = ({ value, onChange, size = 22 }) => {
   return (
@@ -99,7 +113,10 @@ const PlayerCard = ({ player, onDelete, onTogglePresence, onEdit, animDelay = 0 
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.playerName} numberOfLines={1}>{player.nome}</Text>
-            <Text style={styles.playerAge}>{player.idade} anos</Text>
+            <Text style={styles.playerAge}>
+              {calcularIdade(player.anoNascimento) ?? player.idade} anos
+              {player.anoNascimento ? ` · ${player.anoNascimento}` : ''}
+            </Text>
           </View>
           <LevelBadge stars={player.estrelas} />
         </View>
@@ -236,28 +253,38 @@ const SorteioModal = ({ visible, times, reserva3, reserva4, onClose }) => {
 const CadastroModal = ({ visible, onClose, onSave, jogadorEditando }) => {
   const isEdicao = !!jogadorEditando;
   const [nome, setNome] = useState('');
-  const [idade, setIdade] = useState('');
+  const [anoNascimento, setAnoNascimento] = useState('');
   const [estrelas, setEstrelas] = useState(3);
+
+  // Idade calculada em tempo real conforme o usuário digita o ano
+  const idadeCalculada = anoValido(anoNascimento) ? calcularIdade(anoNascimento) : null;
 
   useEffect(() => {
     if (jogadorEditando) {
       setNome(jogadorEditando.nome);
-      setIdade(String(jogadorEditando.idade));
+      // Suporte a jogadores antigos cadastrados com idade direta
+      setAnoNascimento(
+        jogadorEditando.anoNascimento
+          ? String(jogadorEditando.anoNascimento)
+          : jogadorEditando.idade
+            ? String(anoAtual - jogadorEditando.idade)
+            : ''
+      );
       setEstrelas(jogadorEditando.estrelas);
     } else {
       setNome('');
-      setIdade('');
+      setAnoNascimento('');
       setEstrelas(3);
     }
   }, [jogadorEditando, visible]);
 
   const handleSave = () => {
     if (!nome.trim()) return Alert.alert('Atenção', 'Informe o nome do jogador.');
-    const idadeNum = parseInt(idade);
-    if (!idade || isNaN(idadeNum) || idadeNum < 5 || idadeNum > 99)
-      return Alert.alert('Atenção', 'Informe uma idade válida (5-99).');
-    onSave({ nome: nome.trim(), idade: idadeNum, estrelas });
-    setNome(''); setIdade(''); setEstrelas(3);
+    if (!anoValido(anoNascimento))
+      return Alert.alert('Atenção', `Informe um ano de nascimento válido (1940 a ${anoAtual - 5}).`);
+    const idade = calcularIdade(anoNascimento);
+    onSave({ nome: nome.trim(), anoNascimento: parseInt(anoNascimento), idade, estrelas });
+    setNome(''); setAnoNascimento(''); setEstrelas(3);
     onClose();
   };
 
@@ -295,16 +322,23 @@ const CadastroModal = ({ visible, onClose, onSave, jogadorEditando }) => {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Idade</Text>
-            <TextInput
-              style={[styles.input, { width: 100 }]}
-              value={idade}
-              onChangeText={setIdade}
-              placeholder="25"
-              placeholderTextColor={COLORS.textDim}
-              keyboardType="number-pad"
-              maxLength={2}
-            />
+            <Text style={styles.formLabel}>Ano de Nascimento</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <TextInput
+                style={[styles.input, { width: 110 }]}
+                value={anoNascimento}
+                onChangeText={setAnoNascimento}
+                placeholder="Ex: 1995"
+                placeholderTextColor={COLORS.textDim}
+                keyboardType="number-pad"
+                maxLength={4}
+              />
+              {idadeCalculada !== null && (
+                <View style={styles.idadeTag}>
+                  <Text style={styles.idadeTagText}>{idadeCalculada} anos</Text>
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={styles.formGroup}>
@@ -845,6 +879,19 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   cancelEditBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.textMuted },
+  idadeTag: {
+    backgroundColor: COLORS.greenMuted,
+    borderWidth: 1,
+    borderColor: COLORS.green + '55',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  idadeTagText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.green,
+  },
   sorteioBanner: {
     backgroundColor: '#1a2a3a',
     borderRadius: 10,
