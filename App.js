@@ -5,6 +5,8 @@ import {
   StatusBar, Platform, Dimensions, SafeAreaView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 
 const { width } = Dimensions.get('window');
 
@@ -168,12 +170,37 @@ const PlayerCard = ({ player, onDelete, onTogglePresence, onEdit, animDelay = 0 
   );
 };
 
+// ─── Componente: Card de Time para captura ──────────────────────────────────────
+const TeamCardCapture = ({ time, idx, teamColors, teamNames }) => (
+  <View style={[styles.teamCard, { borderColor: teamColors[idx] + '55' }]}>
+    <View style={[styles.teamHeader, { backgroundColor: teamColors[idx] + '22' }]}>
+      <Text style={[styles.teamName, { color: teamColors[idx] }]}>{teamNames[idx]}</Text>
+      <View style={[styles.teamCountBadge, { backgroundColor: teamColors[idx] + '33' }]}>
+        <Text style={[styles.teamCountText, { color: teamColors[idx] }]}>
+          {time.length} jogadores
+        </Text>
+      </View>
+    </View>
+    {time.map((p, pIdx) => (
+      <View key={p.id} style={[styles.teamPlayer, pIdx < time.length - 1 && styles.teamPlayerBorder]}>
+        <View style={[styles.teamPlayerNum, { backgroundColor: teamColors[idx] + '22' }]}>
+          <Text style={[styles.teamPlayerNumText, { color: teamColors[idx] }]}>{pIdx + 1}</Text>
+        </View>
+        <Text style={styles.teamPlayerName}>{p.nome}</Text>
+        <StarRating value={p.estrelas} size={13} />
+      </View>
+    ))}
+  </View>
+);
+
 // ─── Componente: Modal de Sorteio ───────────────────────────────────────────────
 const SorteioModal = ({ visible, times, reserva3, reserva4, onClose }) => {
   const teamColors = [COLORS.team1, COLORS.team2, COLORS.team3, COLORS.team4];
   const teamNames = ['⚡ Time 1', '💧 Time 2', '🔥 Time 3 (Reserva)', '💜 Time 4 (Reserva)'];
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const captureViewRef = useRef(null);
+  const [compartilhando, setCompartilhando] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -187,12 +214,40 @@ const SorteioModal = ({ visible, times, reserva3, reserva4, onClose }) => {
     }
   }, [visible]);
 
+  const compartilharResultado = async () => {
+    try {
+      setCompartilhando(true);
+      // Captura a view como imagem PNG
+      const uri = await captureRef(captureViewRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+      // Verifica se o dispositivo suporta compartilhamento
+      const podeCompartilhar = await Sharing.isAvailableAsync();
+      if (!podeCompartilhar) {
+        Alert.alert('Atenção', 'Compartilhamento não disponível neste dispositivo.');
+        return;
+      }
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Compartilhar resultado do Racha',
+      });
+    } catch (e) {
+      Alert.alert('Erro', 'Não foi possível gerar a imagem. Tente novamente.');
+    } finally {
+      setCompartilhando(false);
+    }
+  };
+
   if (!visible) return null;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <Animated.View style={[styles.modalContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
+
+          {/* ── Cabeçalho com botão compartilhar ── */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>⚽ Sorteio dos Times</Text>
             <TouchableOpacity onPress={onClose} style={styles.modalClose}>
@@ -200,44 +255,63 @@ const SorteioModal = ({ visible, times, reserva3, reserva4, onClose }) => {
             </TouchableOpacity>
           </View>
 
+          {/* ── Botão Compartilhar no topo ── */}
+          <TouchableOpacity
+            style={[styles.shareBtn, compartilhando && styles.shareBtnLoading]}
+            onPress={compartilharResultado}
+            activeOpacity={0.8}
+            disabled={compartilhando}
+          >
+            <Text style={styles.shareBtnIcon}>📤</Text>
+            <Text style={styles.shareBtnText}>
+              {compartilhando ? 'Gerando imagem...' : 'Compartilhar Resultado'}
+            </Text>
+          </TouchableOpacity>
+
           <ScrollView showsVerticalScrollIndicator={false}>
-            {(reserva3 || reserva4) && (
-              <View style={styles.sorteioBanner}>
-                <Text style={styles.sorteioBannerText}>
-                  ℹ️ Times 1 e 2 foram equilibrados por estrelas e idade.
-                  {reserva3 ? ' Time 3 formado pelos confirmados após o 20º.' : ''}
-                  {reserva4 ? ' Time 4 formado pelos confirmados após o 30º.' : ''}
-                </Text>
-              </View>
-            )}
-            {times.map((time, idx) => (
-              <View key={idx} style={[styles.teamCard, { borderColor: teamColors[idx] + '55' }]}>
-                <View style={[styles.teamHeader, { backgroundColor: teamColors[idx] + '22' }]}>
-                  <Text style={[styles.teamName, { color: teamColors[idx] }]}>{teamNames[idx]}</Text>
-                  <View style={[styles.teamCountBadge, { backgroundColor: teamColors[idx] + '33' }]}>
-                    <Text style={[styles.teamCountText, { color: teamColors[idx] }]}>
-                      {time.length} jogadores
-                    </Text>
+            {/* ── Área capturada como imagem ── */}
+            <ViewShot ref={captureViewRef} options={{ format: 'png', quality: 1 }}>
+              <View style={styles.captureArea}>
+                {/* Cabeçalho da imagem */}
+                <View style={styles.captureHeader}>
+                  <Text style={styles.captureHeaderIcon}>⚽</Text>
+                  <View>
+                    <Text style={styles.captureHeaderTitle}>Tampa Virtual do Racha</Text>
+                    <Text style={styles.captureHeaderSub}>Resultado do Sorteio</Text>
                   </View>
                 </View>
-                {time.map((p, pIdx) => (
-                  <View key={p.id} style={[styles.teamPlayer, pIdx < time.length - 1 && styles.teamPlayerBorder]}>
-                    <View style={[styles.teamPlayerNum, { backgroundColor: teamColors[idx] + '22' }]}>
-                      <Text style={[styles.teamPlayerNumText, { color: teamColors[idx] }]}>{pIdx + 1}</Text>
-                    </View>
-                    <Text style={styles.teamPlayerName}>{p.nome}</Text>
-                    <StarRating value={p.estrelas} size={13} />
-                  </View>
-                ))}
-              </View>
-            ))}
 
-            {times.length === 0 && (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateIcon}>😅</Text>
-                <Text style={styles.emptyStateText}>Nenhum jogador confirmado!</Text>
+                {(reserva3 || reserva4) && (
+                  <View style={styles.sorteioBanner}>
+                    <Text style={styles.sorteioBannerText}>
+                      ℹ️ Times 1 e 2 equilibrados por estrelas e idade.
+                      {reserva3 ? ' Time 3: confirmados após o 20º.' : ''}
+                      {reserva4 ? ' Time 4: confirmados após o 30º.' : ''}
+                    </Text>
+                  </View>
+                )}
+
+                {times.map((time, idx) => (
+                  <TeamCardCapture
+                    key={idx}
+                    time={time}
+                    idx={idx}
+                    teamColors={teamColors}
+                    teamNames={teamNames}
+                  />
+                ))}
+
+                {times.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateIcon}>😅</Text>
+                    <Text style={styles.emptyStateText}>Nenhum jogador confirmado!</Text>
+                  </View>
+                )}
+
+                {/* Rodapé da imagem */}
+                <Text style={styles.captureFooter}>🏟️ Gerado pelo Tampa Virtual do Racha</Text>
               </View>
-            )}
+            </ViewShot>
           </ScrollView>
 
           <TouchableOpacity style={styles.closeModalBtn} onPress={onClose} activeOpacity={0.8}>
@@ -892,6 +966,67 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.green,
   },
+  // Compartilhar
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1a3a5c',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.blue + '66',
+    paddingVertical: 11,
+    marginBottom: 14,
+    gap: 8,
+  },
+  shareBtnLoading: {
+    opacity: 0.6,
+  },
+  shareBtnIcon: { fontSize: 18 },
+  shareBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.blue,
+  },
+
+  // Área de captura da imagem
+  captureArea: {
+    backgroundColor: COLORS.bg,
+    padding: 12,
+    borderRadius: 12,
+  },
+  captureHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  captureHeaderIcon: { fontSize: 32 },
+  captureHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  captureHeaderSub: {
+    fontSize: 11,
+    color: COLORS.green,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  captureFooter: {
+    fontSize: 11,
+    color: COLORS.textDim,
+    textAlign: 'center',
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+
   sorteioBanner: {
     backgroundColor: '#1a2a3a',
     borderRadius: 10,
